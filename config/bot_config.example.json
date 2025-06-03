@@ -62,7 +62,7 @@
       "description": "Drafts, critiques, and refines AI field notes like a careful pirate documenting discoveries"
     },
     "dpo": {
-      "enabled": false,
+      "enabled": true,
       "signature_emoji": "🔄",
       "description": "Uses preference optimization to choose the most valuable field notes"
     },

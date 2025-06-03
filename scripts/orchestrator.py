@@ -23,6 +23,7 @@ except ImportError:
     print("⚠️ W&B not installed. Run: pip install wandb")
 
 from scripts.self_refine_bot import SelfRefineBot
+from scripts.dpo_bot import DPOBot
 
 
 class BotOrchestrator:
@@ -223,12 +224,20 @@ class BotOrchestrator:
         """Initialize all enabled bots."""
         bots = []
         
-        # For now, only initialize Self-Refine bot
-        # TODO: Add other bot types as they're implemented
+        # Initialize Self-Refine bot
         if self.config['bots']['self_refine']['enabled']:
-            print("🪲 Initializing Self-Refine Bot...")
+            print("✍️ Initializing Self-Refine Bot...")
             bots.append(SelfRefineBot(self.config))
             print("✅ Self-Refine Bot ready!")
+        
+        # Initialize DPO bot  
+        if self.config['bots']['dpo']['enabled']:
+            print("🔄 Initializing DPO Bot...")
+            bots.append(DPOBot(self.config))
+            print("✅ DPO Bot ready!")
+        
+        # TODO: Add other bot types as they're implemented
+        # RLAIF, Mind-Pool, DevOps Self-Fix bots
         
         return bots
     
