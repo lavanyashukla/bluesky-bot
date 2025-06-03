@@ -1,72 +1,91 @@
 {
   "project": {
-    "name": "I Wonder Social-Bot Showdown",
-    "goal": "Reach 1,000 followers while teaching AI improvement loops",
+    "name": "AI Field Notes - Pirate's Adventure",
+    "description": "Hit 1,000 followers in ≤7 days by posting bite-sized, actionable summaries of real-world AI deployments—how companies and people are using AI right now, minus the hype.",
+    "target_followers": 1000,
     "duration_days": 7,
-    "target_followers": 1000
+    "theme": "pirate_field_notes"
   },
   "bluesky": {
     "handle": "your-handle.bsky.social",
-    "password": "YOUR_BLUESKY_APP_PASSWORD",
-    "service": "https://bsky.social"
+    "app_password": "your-app-password"
   },
   "openai": {
-    "api_key": "YOUR_OPENAI_API_KEY",
-    "model": "gpt-4",
-    "judge_model": "gpt-4o",
-    "max_tokens": 280,
-    "temperature": 0.7
-  },
-  "bots": {
-    "self_refine": {
-      "emoji": "🪲",
-      "name": "Self-Refine Bot",
-      "enabled": true,
-      "improvement_frequency": "every_post"
-    },
-    "dpo": {
-      "emoji": "👾", 
-      "name": "DPO Bot",
-      "enabled": true,
-      "improvement_threshold": 5,
-      "improvement_frequency": "continuous"
-    },
-    "rlaif": {
-      "emoji": "🐾",
-      "name": "RLAIF Bot", 
-      "enabled": true,
-      "improvement_frequency": "every_3_drafts"
-    },
-    "mind_pool": {
-      "emoji": "🦕",
-      "name": "Mind-Pool Bot",
-      "enabled": true,
-      "personas_count": 6,
-      "improvement_trigger": "every_50_impressions"
-    },
-    "devops_self_fix": {
-      "emoji": "🦍",
-      "name": "DevOps Self-Fix Bot",
-      "enabled": true,
-      "monitoring_interval": 60,
-      "improvement_frequency": "continuous"
-    }
+    "api_key": "your-openai-api-key",
+    "model": "gpt-4o-mini",
+    "use_moderation": true
   },
   "posting": {
     "shift_interval_minutes": 30,
     "max_posts_per_day": 48,
-    "rate_limit_buffer": 0.8
+    "character_limit": 280,
+    "require_source_link": true
   },
   "rules": {
-    "tone": "educational, engaging, not overly technical",
-    "topics": ["AI/ML", "self-improvement", "tech leadership", "automation"],
-    "forbidden_words": ["crypto", "trading", "financial advice"],
-    "max_hashtags": 3,
-    "reply_sla_minutes": 120
+    "content_focus": "real_world_ai_deployments",
+    "writing_style": "pirate_field_notes",
+    "accuracy_required": true,
+    "avoid_buzzwords": true,
+    "max_body_characters": 280,
+    "require_credible_source": true,
+    "respond_to_questions_within_hours": 2,
+    "include_signature_emoji": true,
+    "signature_emojis": {
+      "self_refine": "✍️",
+      "dpo": "🔄", 
+      "rlaif": "🎯",
+      "mind_pool": "🛠️",
+      "devops_self_fix": "🧬"
+    },
+    "prohibited": [
+      "political_endorsements",
+      "personal_data",
+      "speculative_stock_advice",
+      "marketing_buzzwords",
+      "unverified_claims"
+    ]
+  },
+  "content_guidelines": {
+    "target_audience": "executives_practitioners",
+    "tone": "pirate_adventurer_reporting",
+    "value_proposition": "actionable_intelligence",
+    "source_requirements": {
+      "credible_url_or_doi": true,
+      "shortened_links": true,
+      "paywall_tag": true
+    }
+  },
+  "bots": {
+    "self_refine": {
+      "enabled": true,
+      "signature_emoji": "✍️",
+      "description": "Drafts, critiques, and refines AI field notes like a careful pirate documenting discoveries"
+    },
+    "dpo": {
+      "enabled": false,
+      "signature_emoji": "🔄",
+      "description": "Uses preference optimization to choose the most valuable field notes"
+    },
+    "rlaif": {
+      "enabled": false,
+      "signature_emoji": "🎯", 
+      "description": "AI feedback to improve field note quality and engagement"
+    },
+    "mind_pool": {
+      "enabled": false,
+      "signature_emoji": "🛠️",
+      "description": "Multiple AI perspectives merged into comprehensive field notes"
+    },
+    "devops_self_fix": {
+      "enabled": false,
+      "signature_emoji": "🧬",
+      "description": "Auto-debugging and improving field note generation process"
+    }
   },
   "monitoring": {
-    "dashboard_refresh_seconds": 30,
+    "wandb_project": "ai-field-notes-pirate",
     "log_level": "INFO",
-    "metrics_retention_days": 30
+    "track_engagement": true,
+    "track_source_quality": true
   }
 } 

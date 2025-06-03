@@ -1,234 +1,239 @@
-"""Self-Refine Bot - Draft → self-critique → rewrite improvement loop."""
+"""
+Self-Refine Bot for AI Field Notes - Pirate's Adventure
+Generates, critiques, and refines field notes about real-world AI deployments
+"""
 
-import openai
+import json
+import re
+import requests
 from datetime import datetime
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Tuple, Optional
 from scripts.base_bot import BaseBot
 
 
 class SelfRefineBot(BaseBot):
-    """Bot that improves posts through self-critique and refinement."""
+    """
+    Self-Refine Bot that creates field notes about real-world AI deployments
+    using a pirate adventurer theme with self-improvement loop.
+    """
     
     def __init__(self, config: Dict[str, Any]):
-        super().__init__(config, 'self_refine')
-        self.refinement_history = []
-    
-    def generate_post(self, prompt: Optional[str] = None) -> str:
-        """Generate a post with self-refinement (legacy method)."""
-        post, _ = self.generate_post_with_details(prompt)
-        return post
-    
-    def generate_post_with_details(self, prompt: Optional[str] = None) -> Tuple[str, Dict[str, Any]]:
-        """Generate a post with self-refinement and return process details."""
-        if not prompt:
-            prompt = self._get_default_prompt()
+        super().__init__(config, "self_refine", "✍️ Self-Refine Pirate")
+        self.signature_emoji = "✍️"
+        self.use_moderation = config.get('openai', {}).get('use_moderation', True)
         
-        print(f"🪲 Self-Refine Bot: Starting generation process...")
-        print(f"📋 Prompt: '{prompt}'")
-        print()
+        # AI Field Notes prompts
+        self.prompts = {
+            "generate": """You are a pirate adventurer documenting real-world AI deployments for fellow sailors back on land. 
+
+Your mission: Write a field note about how companies/people are ACTUALLY using AI right now (not theoretical or future possibilities).
+
+Requirements:
+- Act like a pirate sending notes from your adventures 
+- Focus on ONE specific, real AI deployment you've "discovered"
+- Max 280 characters for main content
+- Include a credible source (company blog, research paper, news article)
+- Executive-worthy insight ("Slack-worthy")
+- Avoid marketing buzzwords and hype
+- Be accurate and actionable
+
+Examples of good field notes:
+- "Ahoy! Just spotted Shopify using AI to auto-generate product descriptions - cutting merchant setup time by 70%. Their GPT integration processes 10M+ descriptions monthly. Smart treasure for e-commerce crews! ✍️"
+- "Matey! Netflix's AI thumbnail generation caught me eye - creates 1000+ variants per title, boosting click rates 20-30%. They A/B test everything. Visual hooks = more viewers aboard! ✍️"
+
+Write a field note about a recent, real AI deployment. Include the signature emoji ✍️ at the end.""",
+
+            "critique": """You are an experienced pirate quartermaster reviewing field notes before sending them to shore.
+
+Evaluate this field note for:
+
+ACCURACY & CREDIBILITY:
+- Is the AI deployment claim verifiable and specific?
+- Does it include a credible source?
+- Are the metrics/numbers realistic?
+
+PIRATE VOICE & ENGAGEMENT:
+- Does it sound like an adventurous pirate reporting discoveries?
+- Is it "Slack-worthy" for executives?
+- Avoids marketing buzzwords?
+
+STRUCTURE & LENGTH:
+- Under 280 characters for main content?
+- Includes signature emoji ✍️?
+- Clear, actionable insight?
+
+FIELD NOTE TO REVIEW:
+{draft}
+
+Provide specific critique and improvement suggestions. Be thorough but constructive.""",
+
+            "refine": """You are the same pirate adventurer, now revising your field note based on the quartermaster's feedback.
+
+ORIGINAL DRAFT:
+{draft}
+
+QUARTERMASTER'S CRITIQUE:
+{critique}
+
+Rewrite the field note incorporating the feedback. Maintain the pirate voice while ensuring:
+- Accurate, verifiable AI deployment info
+- Under 280 characters
+- Includes credible source reference  
+- Ends with signature emoji ✍️
+- Executive-worthy actionable insight
+- Avoids buzzwords and hype
+
+Write the improved field note:"""
+        }
+
+    def generate_post_with_details(self) -> Tuple[str, Dict[str, Any]]:
+        """Generate a field note with full self-refine process details."""
         
-        # Initialize process tracking
         process_details = {
-            'prompt': prompt,
-            'initial_draft': '',
-            'critique': '',
-            'refined_post': '',
-            'improvement_made': False
+            'timestamp': datetime.now().isoformat(),
+            'bot_type': self.bot_type,
+            'prompt': self.prompts['generate'][:200] + "...",
+            'improvement_made': False,
+            'error_message': ''
         }
         
-        # Step 1: Generate initial draft
-        print("Step 1: 📝 Generating initial draft...")
-        initial_draft = self._generate_initial_draft(prompt)
-        process_details['initial_draft'] = initial_draft
-        print(f"✅ Initial draft: '{initial_draft}'")
-        print(f"   Length: {len(initial_draft)} characters")
-        print()
-        
-        # Step 2: Self-critique
-        print("Step 2: 🔍 Self-critiquing...")
-        critique = self._self_critique(initial_draft)
-        process_details['critique'] = critique
-        print(f"✅ Critique: {critique[:100]}...")
-        print()
-        
-        # Step 3: Refine based on critique
-        print("Step 3: ✨ Refining based on critique...")
-        refined_post = self._refine_post(initial_draft, critique)
-        process_details['refined_post'] = refined_post
-        print(f"✅ Refined post: '{refined_post}'")
-        print(f"   Length: {len(refined_post)} characters")
-        print()
-        
-        # Check if improvement was made
-        improvement_made = initial_draft != refined_post.replace(f" {self.emoji}", "")
-        process_details['improvement_made'] = improvement_made
-        
-        # Log the refinement process
-        self._log_refinement(initial_draft, critique, refined_post)
-        
-        # Show comparison
-        print("📊 COMPARISON:")
-        print(f"   BEFORE: '{initial_draft}'")
-        print(f"   AFTER:  '{refined_post}'")
-        print(f"   IMPROVED: {'✅ Yes' if improvement_made else '➖ Minimal'}")
-        print()
-        
-        return refined_post, process_details
-    
-    def _generate_initial_draft(self, prompt: str) -> str:
-        """Generate the initial post draft."""
         try:
-            print("   🤖 Calling OpenAI for initial draft...")
-            response = openai.chat.completions.create(
+            print("🏴‍☠️ Generating AI field note...")
+            
+            # Step 1: Generate initial draft
+            initial_response = self.openai_client.chat.completions.create(
                 model=self.config['openai']['model'],
-                messages=[
-                    {"role": "system", "content": self._get_system_prompt()},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=self.config['openai']['max_tokens'],
-                temperature=self.config['openai']['temperature']
+                messages=[{"role": "user", "content": self.prompts['generate']}],
+                max_tokens=400,
+                temperature=0.8
             )
+            initial_draft = initial_response.choices[0].message.content.strip()
+            process_details['initial_draft'] = initial_draft
             
-            draft = response.choices[0].message.content.strip()
-            print(f"   ✅ OpenAI responded with {len(draft)} characters")
-            return draft
+            print(f"📝 Initial draft: {initial_draft}")
+            print(f"Length: {len(initial_draft)} characters")
             
-        except Exception as e:
-            print(f"   ❌ Error: {e}")
-            self.logger.error(f"Initial draft generation failed: {e}")
-            return "Drafting thoughts on self-improvement..."
-    
-    def _self_critique(self, draft: str) -> str:
-        """Generate self-critique of the draft."""
-        critique_prompt = f"""
-        Critique this Bluesky post draft for a bot showdown about self-refine improvement loops:
-
-        DRAFT: "{draft}"
-
-        Evaluate:
-        1. Is it engaging and educational?
-        2. Does it teach something about self-improvement or AI?
-        3. Is the tone appropriate for tech leaders?
-        4. Can it be made more compelling?
-        5. Any unnecessary words that could be trimmed?
-
-        Provide specific, actionable feedback for improvement.
-        """
-        
-        try:
-            print("   🤖 Calling OpenAI for self-critique...")
-            response = openai.chat.completions.create(
+            # Check moderation if enabled
+            if self.use_moderation:
+                if not self._passes_moderation(initial_draft):
+                    process_details['error_message'] = 'Content flagged by moderation'
+                    print("⚠️ Content flagged by OpenAI moderation")
+                    return self._generate_fallback_post(), process_details
+            
+            # Step 2: Self-critique  
+            print("\n🔍 Self-critiquing...")
+            critique_prompt = self.prompts['critique'].format(draft=initial_draft)
+            
+            critique_response = self.openai_client.chat.completions.create(
                 model=self.config['openai']['model'],
-                messages=[
-                    {"role": "system", "content": "You are a expert social media content critic focused on educational tech content."},
-                    {"role": "user", "content": critique_prompt}
-                ],
-                max_tokens=200,
+                messages=[{"role": "user", "content": critique_prompt}],
+                max_tokens=500,
                 temperature=0.3
             )
+            critique = critique_response.choices[0].message.content.strip()
+            process_details['critique'] = critique
             
-            critique = response.choices[0].message.content.strip()
-            print(f"   ✅ Generated critique ({len(critique)} characters)")
-            return critique
+            print(f"🔍 Critique: {critique[:100]}...")
             
-        except Exception as e:
-            print(f"   ❌ Error: {e}")
-            self.logger.error(f"Self-critique failed: {e}")
-            return "Could be more engaging and educational."
-    
-    def _refine_post(self, draft: str, critique: str) -> str:
-        """Refine the post based on self-critique."""
-        refinement_prompt = f"""
-        Improve this Bluesky post based on the critique:
-
-        ORIGINAL: "{draft}"
-        CRITIQUE: "{critique}"
-
-        Create an improved version that:
-        - Addresses the critique points
-        - Stays under 300 characters (including emoji)
-        - Remains educational and engaging
-        - Teaches about self-improvement or AI concepts
-
-        Return only the improved post, no explanation.
-        """
-        
-        try:
-            print("   🤖 Calling OpenAI for refinement...")
-            response = openai.chat.completions.create(
-                model=self.config['openai']['model'],
-                messages=[
-                    {"role": "system", "content": self._get_system_prompt()},
-                    {"role": "user", "content": refinement_prompt}
-                ],
-                max_tokens=self.config['openai']['max_tokens'],
-                temperature=0.5
+            # Step 3: Refine based on critique
+            print("\n✍️ Refining field note...")
+            refine_prompt = self.prompts['refine'].format(
+                draft=initial_draft,
+                critique=critique
             )
             
-            refined = response.choices[0].message.content.strip()
-            result = self._add_emoji_signature(refined)
-            print(f"   ✅ Refined and added emoji signature ({len(result)} characters)")
-            return result
+            refined_response = self.openai_client.chat.completions.create(
+                model=self.config['openai']['model'],
+                messages=[{"role": "user", "content": refine_prompt}],
+                max_tokens=400,
+                temperature=0.7
+            )
+            refined_post = refined_response.choices[0].message.content.strip()
+            process_details['refined_post'] = refined_post
+            
+            print(f"✨ Refined post: {refined_post}")
+            print(f"Length: {len(refined_post)} characters")
+            
+            # Check if improvement was made
+            if len(refined_post) != len(initial_draft) or refined_post != initial_draft:
+                process_details['improvement_made'] = True
+                print("✅ Improvement detected!")
+            
+            # Final moderation check
+            if self.use_moderation:
+                if not self._passes_moderation(refined_post):
+                    print("⚠️ Refined content flagged by moderation, using initial draft")
+                    return initial_draft, process_details
+            
+            return refined_post, process_details
             
         except Exception as e:
-            print(f"   ❌ Error: {e}")
-            self.logger.error(f"Post refinement failed: {e}")
-            return self._add_emoji_signature(draft)
-    
-    def _log_refinement(self, draft: str, critique: str, refined: str):
-        """Log the refinement process for analysis."""
-        refinement_record = {
-            'timestamp': datetime.now().isoformat(),
-            'initial_draft': draft,
-            'critique': critique,
-            'refined_post': refined,
-            'improvement_made': draft != refined.replace(f" {self.emoji}", "")
-        }
-        
-        self.refinement_history.append(refinement_record)
-        
-        if refinement_record['improvement_made']:
-            self.stats['improvements_made'] += 1
-            self.stats['last_improvement'] = refinement_record['timestamp']
-            print(f"📈 Improvement #{self.stats['improvements_made']} logged!")
-        else:
-            print("📊 Minimal change detected")
-        
-        self.logger.info(f"Refinement {'successful' if refinement_record['improvement_made'] else 'minimal'}")
-    
-    def improve(self, feedback: Dict[str, Any]) -> None:
-        """Improve based on engagement feedback."""
-        # For Self-Refine bot, improvement happens during generation
-        # But we can learn from engagement patterns
-        if feedback.get('likes', 0) < 2:  # Low engagement threshold
-            print(f"📉 Low engagement detected ({feedback.get('likes', 0)} likes)")
-            self.logger.info("Low engagement detected, will increase temperature for next generation")
-            # Could adjust parameters for future posts
-    
-    def get_improvement_status(self) -> Dict[str, Any]:
-        """Get current improvement status for dashboard."""
-        recent_refinements = [r for r in self.refinement_history[-10:]]
-        
-        return {
-            'bot_type': self.bot_type,
-            'total_refinements': len(self.refinement_history),
-            'successful_improvements': self.stats['improvements_made'],
-            'improvement_rate': (self.stats['improvements_made'] / max(1, len(self.refinement_history))) * 100,
-            'recent_activity': recent_refinements,
-            'next_improvement': 'Every post (built-in refinement loop)'
-        }
-    
-    def _get_default_prompt(self) -> str:
-        """Get default post prompt emphasizing self-refinement."""
-        prompts = [
-            "Share a practical insight about iterative improvement in AI systems",
-            "Explain why self-critique leads to better outcomes than first drafts",
-            "Describe how the best solutions emerge through refinement loops",
-            "Share how self-reflection improves both humans and AI systems",
-            "Explain the power of iterate-and-improve mindset for tech leaders"
+            print(f"❌ Error in field note generation: {e}")
+            process_details['error_message'] = str(e)
+            return self._generate_fallback_post(), process_details
+
+    def _passes_moderation(self, content: str) -> bool:
+        """Check content against OpenAI moderation API."""
+        try:
+            response = self.openai_client.moderations.create(input=content)
+            return not response.results[0].flagged
+        except Exception as e:
+            print(f"⚠️ Moderation check failed: {e}")
+            return True  # Allow if moderation fails
+
+    def _generate_fallback_post(self) -> str:
+        """Generate a safe fallback field note."""
+        fallbacks = [
+            "Ahoy! Just discovered GitHub Copilot helping developers code 55% faster in enterprise ships. Microsoft's AI mate is revolutionizing how crews build software. Every line counts on the digital seas! ✍️",
+            
+            "Matey! Spotted Grammarly's AI writing assistant used by 30M+ sailors worldwide. Their ML checks grammar, tone, and clarity in real-time. Clean communication = successful voyages! ✍️",
+            
+            "Avast! Found Notion's AI features helping teams organize knowledge 40% faster. Auto-summaries and smart search keep crews aligned. Information management be the new treasure! ✍️"
         ]
         
         import random
-        selected = random.choice(prompts)
-        print(f"🎲 Selected prompt: '{selected}'")
-        return selected 
+        return random.choice(fallbacks)
+
+    def validate_post(self, content: str) -> bool:
+        """Validate field note meets requirements."""
+        
+        # Check length (allowing some buffer for links)
+        if len(content) > 300:
+            print(f"❌ Post too long: {len(content)} characters")
+            return False
+        
+        # Check for signature emoji
+        if "✍️" not in content:
+            print("❌ Missing signature emoji ✍️")
+            return False
+        
+        # Check for basic pirate elements (not too strict)
+        pirate_indicators = [
+            'ahoy', 'matey', 'avast', 'spotted', 'discovered', 'treasure',
+            'crew', 'ship', 'sail', 'adventure', 'voyage', 'aboard'
+        ]
+        
+        content_lower = content.lower()
+        has_pirate_tone = any(indicator in content_lower for indicator in pirate_indicators)
+        
+        if not has_pirate_tone:
+            print("⚠️ Weak pirate tone detected, but allowing...")
+        
+        # Check for prohibited content
+        prohibited = ['crypto', 'trading', 'buy', 'sell', 'investment advice']
+        if any(word in content_lower for word in prohibited):
+            print("❌ Contains prohibited content")
+            return False
+        
+        print("✅ Field note validation passed")
+        return True
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get bot statistics."""
+        return {
+            "posts_generated": getattr(self, 'posts_generated', 0),
+            "improvements_made": getattr(self, 'improvements_made', 0),
+            "moderation_flags": getattr(self, 'moderation_flags', 0),
+            "signature_emoji": self.signature_emoji,
+            "theme": "AI Field Notes - Pirate Adventure"
+        } 
