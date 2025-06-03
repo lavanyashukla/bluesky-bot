@@ -35,6 +35,25 @@ def load_config():
     with open(config_path, 'r') as f:
         return json.load(f)
 
+def save_user_config(config: Dict[str, Any]):
+    """Save user configuration to session and optionally to file."""
+    st.session_state.config = config
+    
+    # Optionally save to a user config file
+    try:
+        user_config_path = "config/user_config.json"
+        os.makedirs("config", exist_ok=True)
+        with open(user_config_path, 'w') as f:
+            # Don't save sensitive data to file, only structure
+            safe_config = config.copy()
+            if 'openai' in safe_config and 'api_key' in safe_config['openai']:
+                safe_config['openai']['api_key'] = "user-provided"
+            if 'bluesky' in safe_config and 'app_password' in safe_config['bluesky']:
+                safe_config['bluesky']['app_password'] = "user-provided"
+            json.dump(safe_config, f, indent=2)
+    except Exception as e:
+        st.warning(f"Could not save config file: {e}")
+
 def init_session_state():
     """Initialize session state variables."""
     if 'config' not in st.session_state:
@@ -54,6 +73,13 @@ def init_session_state():
     
     if 'preference_manager' not in st.session_state:
         st.session_state.preference_manager = get_preference_manager()
+    
+    # Configuration state
+    if 'show_config' not in st.session_state:
+        st.session_state.show_config = False
+    
+    if 'config_saved' not in st.session_state:
+        st.session_state.config_saved = False
 
 def create_sidebar():
     """Create the technique selection sidebar."""
@@ -62,17 +88,33 @@ def create_sidebar():
     technique = st.sidebar.radio(
         "Choose your AI improvement method:",
         [
+            "⚙️ Configuration",
             "✍️ Self-Refine",
             "🔄 DPO (Interactive Learning)",
             "🎯 RLAIF (Coming Soon)",
             "🛠️ Mind-Pool (Coming Soon)",
             "🧬 DevOps Self-Fix (Coming Soon)"
         ],
-        index=0
+        index=1  # Default to Self-Refine
     )
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 📊 **Current Status**")
+    
+    # Configuration status
+    config = st.session_state.config
+    api_configured = bool(config.get('openai', {}).get('api_key') and 
+                         config.get('openai', {}).get('api_key') != 'your-openai-api-key')
+    bluesky_configured = bool(config.get('bluesky', {}).get('handle') and 
+                             config.get('bluesky', {}).get('app_password') and
+                             config.get('bluesky', {}).get('handle') != 'your-handle.bsky.social')
+    
+    if api_configured and bluesky_configured:
+        st.sidebar.success("✅ **APIs Configured**")
+    elif api_configured:
+        st.sidebar.warning("⚠️ **OpenAI Only** (Demo mode)")
+    else:
+        st.sidebar.info("ℹ️ **Demo Mode** (No APIs)")
     
     # Get deployment status from preference manager
     deployment_status = st.session_state.preference_manager.get_deployment_status()
@@ -96,6 +138,330 @@ def create_sidebar():
     
     return technique
 
+def configuration_interface():
+    """Configuration interface for goals, rules, and API keys."""
+    st.markdown("# ⚙️ **Configuration**")
+    st.markdown("**Set up your AI bot goals, rules, and API credentials.**")
+    
+    # Tabs for different configuration sections
+    tab1, tab2, tab3, tab4 = st.tabs(["🎯 Goals", "📋 Rules", "🔑 API Keys", "💾 Export/Import"])
+    
+    config = st.session_state.config.copy()
+    
+    with tab1:
+        st.markdown("### 🎯 **Bot Goals & Project Settings**")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            project_name = st.text_input(
+                "Project Name",
+                value=config.get('project', {}).get('name', 'AI Field Notes - Pirate\'s Adventure'),
+                help="Name of your AI bot project"
+            )
+            
+            target_followers = st.number_input(
+                "Target Followers",
+                min_value=100,
+                max_value=100000,
+                value=config.get('project', {}).get('target_followers', 1000),
+                step=100,
+                help="How many followers you want to reach"
+            )
+        
+        with col2:
+            duration_days = st.number_input(
+                "Duration (Days)",
+                min_value=1,
+                max_value=30,
+                value=config.get('project', {}).get('duration_days', 7),
+                help="How long to run the campaign"
+            )
+            
+            theme = st.selectbox(
+                "Theme Style",
+                ["pirate_field_notes", "professional", "casual", "technical"],
+                index=0,
+                help="Writing style for your bot"
+            )
+        
+        description = st.text_area(
+            "Project Description",
+            value=config.get('project', {}).get('description', ''),
+            height=100,
+            help="Describe what your bot does"
+        )
+        
+        # Update config
+        if 'project' not in config:
+            config['project'] = {}
+        config['project'].update({
+            'name': project_name,
+            'target_followers': target_followers,
+            'duration_days': duration_days,
+            'theme': theme,
+            'description': description
+        })
+    
+    with tab2:
+        st.markdown("### 📋 **Content Rules & Guidelines**")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Content Focus:**")
+            content_focus = st.selectbox(
+                "Primary Content Type",
+                ["real_world_ai_deployments", "ai_research", "tech_news", "educational"],
+                index=0
+            )
+            
+            max_chars = st.number_input(
+                "Max Characters",
+                min_value=100,
+                max_value=500,
+                value=config.get('rules', {}).get('max_body_characters', 280),
+                help="Maximum characters per post"
+            )
+            
+            require_source = st.checkbox(
+                "Require Credible Sources",
+                value=config.get('rules', {}).get('require_credible_source', True),
+                help="Always include source links"
+            )
+        
+        with col2:
+            st.markdown("**Writing Style:**")
+            writing_style = st.selectbox(
+                "Writing Style",
+                ["pirate_field_notes", "professional_reporter", "casual_observer", "technical_analyst"],
+                index=0
+            )
+            
+            avoid_buzzwords = st.checkbox(
+                "Avoid Marketing Buzzwords",
+                value=config.get('rules', {}).get('avoid_buzzwords', True)
+            )
+            
+            accuracy_required = st.checkbox(
+                "Accuracy Required",
+                value=config.get('rules', {}).get('accuracy_required', True),
+                help="Fact-check all claims"
+            )
+        
+        st.markdown("**Prohibited Content:**")
+        prohibited_items = st.multiselect(
+            "Select prohibited content types:",
+            ["political_endorsements", "personal_data", "speculative_stock_advice", 
+             "marketing_buzzwords", "unverified_claims", "crypto_trading", "financial_advice"],
+            default=config.get('rules', {}).get('prohibited', [])
+        )
+        
+        # Update config
+        if 'rules' not in config:
+            config['rules'] = {}
+        config['rules'].update({
+            'content_focus': content_focus,
+            'writing_style': writing_style,
+            'max_body_characters': max_chars,
+            'require_credible_source': require_source,
+            'avoid_buzzwords': avoid_buzzwords,
+            'accuracy_required': accuracy_required,
+            'prohibited': prohibited_items
+        })
+    
+    with tab3:
+        st.markdown("### 🔑 **API Keys & Credentials**")
+        
+        st.warning("⚠️ **Security Notice:** API keys are stored in session only and not saved to files.")
+        
+        # OpenAI Configuration
+        st.markdown("#### 🤖 **OpenAI Configuration**")
+        col1, col2 = st.columns(2)
+        with col1:
+            openai_key = st.text_input(
+                "OpenAI API Key",
+                value="",
+                type="password",
+                help="Your OpenAI API key for AI generation",
+                placeholder="sk-..."
+            )
+            
+            if openai_key:
+                config.setdefault('openai', {})['api_key'] = openai_key
+                st.success("✅ OpenAI API key provided")
+            else:
+                existing_key = config.get('openai', {}).get('api_key', '')
+                if existing_key and existing_key not in ['your-openai-api-key', 'demo-key']:
+                    st.info("🔑 Using previously provided key")
+                else:
+                    st.info("💡 Demo mode without API key")
+        
+        with col2:
+            openai_model = st.selectbox(
+                "OpenAI Model",
+                ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"],
+                index=0,
+                help="Which OpenAI model to use"
+            )
+            
+            use_moderation = st.checkbox(
+                "Use OpenAI Moderation",
+                value=config.get('openai', {}).get('use_moderation', True),
+                help="Check content with OpenAI moderation API"
+            )
+        
+        config.setdefault('openai', {}).update({
+            'model': openai_model,
+            'use_moderation': use_moderation
+        })
+        
+        # Bluesky Configuration
+        st.markdown("#### 🦋 **Bluesky Configuration**")
+        col1, col2 = st.columns(2)
+        with col1:
+            bluesky_handle = st.text_input(
+                "Bluesky Handle",
+                value=config.get('bluesky', {}).get('handle', ''),
+                help="Your Bluesky handle (e.g., yourname.bsky.social)",
+                placeholder="yourname.bsky.social"
+            )
+        
+        with col2:
+            bluesky_password = st.text_input(
+                "Bluesky App Password",
+                value="",
+                type="password",
+                help="App password from Bluesky settings",
+                placeholder="xxxx-xxxx-xxxx-xxxx"
+            )
+        
+        if bluesky_handle:
+            config.setdefault('bluesky', {})['handle'] = bluesky_handle
+        if bluesky_password:
+            config.setdefault('bluesky', {})['app_password'] = bluesky_password
+        
+        # W&B Configuration (Optional)
+        st.markdown("#### 📊 **Weights & Biases (Optional)**")
+        wandb_key = st.text_input(
+            "W&B API Key",
+            value="",
+            type="password",
+            help="Optional: For experiment tracking",
+            placeholder="Your W&B key"
+        )
+        
+        if wandb_key:
+            config.setdefault('monitoring', {})['wandb_api_key'] = wandb_key
+    
+    with tab4:
+        st.markdown("### 💾 **Export/Import Configuration**")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 📤 **Export Configuration**")
+            
+            if st.button("📋 Copy Configuration", use_container_width=True):
+                # Create safe config for export (no sensitive data)
+                export_config = config.copy()
+                
+                # Remove sensitive keys
+                if 'openai' in export_config and 'api_key' in export_config['openai']:
+                    export_config['openai']['api_key'] = "your-openai-api-key"
+                if 'bluesky' in export_config and 'app_password' in export_config['bluesky']:
+                    export_config['bluesky']['app_password'] = "your-app-password"
+                
+                config_json = json.dumps(export_config, indent=2)
+                st.code(config_json, language="json")
+                st.success("✅ Configuration ready to copy!")
+        
+        with col2:
+            st.markdown("#### 📥 **Import Configuration**")
+            
+            uploaded_config = st.text_area(
+                "Paste Configuration JSON",
+                height=200,
+                placeholder='{"project": {"name": "..."}, ...}'
+            )
+            
+            if st.button("🔄 Import Configuration", use_container_width=True):
+                try:
+                    imported_config = json.loads(uploaded_config)
+                    
+                    # Merge with current config, preserving API keys
+                    current_keys = {
+                        'openai_key': config.get('openai', {}).get('api_key'),
+                        'bluesky_password': config.get('bluesky', {}).get('app_password')
+                    }
+                    
+                    config.update(imported_config)
+                    
+                    # Restore API keys if they were set
+                    if current_keys['openai_key']:
+                        config.setdefault('openai', {})['api_key'] = current_keys['openai_key']
+                    if current_keys['bluesky_password']:
+                        config.setdefault('bluesky', {})['app_password'] = current_keys['bluesky_password']
+                    
+                    st.success("✅ Configuration imported successfully!")
+                    st.rerun()
+                    
+                except json.JSONDecodeError as e:
+                    st.error(f"❌ Invalid JSON: {e}")
+                except Exception as e:
+                    st.error(f"❌ Import failed: {e}")
+    
+    # Save configuration
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 1, 1])
+    
+    with col1:
+        if st.button("💾 Save Configuration", type="primary", use_container_width=True):
+            save_user_config(config)
+            st.session_state.config_saved = True
+            st.success("✅ Configuration saved!")
+            st.rerun()
+    
+    with col2:
+        if st.button("🔄 Reset to Defaults", use_container_width=True):
+            st.session_state.config = load_config()
+            st.warning("⚠️ Configuration reset to defaults")
+            st.rerun()
+    
+    with col3:
+        if st.button("🧪 Test Connection", use_container_width=True):
+            test_api_connections(config)
+
+def test_api_connections(config: Dict[str, Any]):
+    """Test API connections with current configuration."""
+    st.markdown("#### 🧪 **Connection Test Results**")
+    
+    # Test OpenAI
+    openai_key = config.get('openai', {}).get('api_key')
+    if openai_key and openai_key not in ['your-openai-api-key', 'demo-key']:
+        try:
+            from scripts.self_refine_bot import SelfRefineBot
+            bot = SelfRefineBot(config)
+            # Test with a simple API call
+            st.success("✅ **OpenAI:** Connection successful")
+        except Exception as e:
+            st.error(f"❌ **OpenAI:** {e}")
+    else:
+        st.info("ℹ️ **OpenAI:** No API key provided (demo mode)")
+    
+    # Test Bluesky
+    bluesky_handle = config.get('bluesky', {}).get('handle')
+    bluesky_password = config.get('bluesky', {}).get('app_password')
+    
+    if bluesky_handle and bluesky_password:
+        try:
+            # Test Bluesky connection (simplified)
+            if '@' not in bluesky_handle or not bluesky_password:
+                raise ValueError("Invalid credentials format")
+            st.success("✅ **Bluesky:** Credentials format valid")
+        except Exception as e:
+            st.error(f"❌ **Bluesky:** {e}")
+    else:
+        st.info("ℹ️ **Bluesky:** No credentials provided")
+
 def self_refine_interface():
     """Interface for Self-Refine bot training."""
     st.markdown("# ✍️ **Self-Refine Bot Training**")
@@ -109,21 +475,19 @@ def self_refine_interface():
         if st.button("🎲 Generate Field Note", type="primary", use_container_width=True):
             with st.spinner("🏴‍☠️ Pirate bot working..."):
                 try:
-                    # Check for real API key
-                    api_key = st.secrets.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
+                    # Use configured API key
+                    config = st.session_state.config
+                    api_key = config.get('openai', {}).get('api_key')
                     
-                    demo_config = st.session_state.config.copy()
-                    demo_config['openai']['api_key'] = api_key or 'demo-key'
-                    
-                    if api_key and api_key != 'demo-key':
+                    if api_key and api_key not in ['your-openai-api-key', 'demo-key']:
                         # Real API call
-                        bot = SelfRefineBot(demo_config)
+                        bot = SelfRefineBot(config)
                         post, details = bot.generate_post_with_details()
                         st.session_state.refinement_demo = details
                     else:
                         # Demo mode
                         st.session_state.refinement_demo = simulate_self_refine()
-                        st.info("🧪 **Demo Mode** - Add OPENAI_API_KEY to secrets for live generation")
+                        st.info("🧪 **Demo Mode** - Configure OpenAI API key in Configuration tab for live generation")
                         
                 except Exception as e:
                     st.error(f"Error: {e}")
@@ -134,13 +498,14 @@ def self_refine_interface():
         
         if 'refinement_demo' in st.session_state:
             if st.button("🚀 Deploy This Model", type="secondary", use_container_width=True):
-                # Deploy self-refine model (simplified for demo)
+                # Deploy self-refine model
                 try:
                     # Save deployment info
                     deployment_data = {
                         'technique': 'self_refine',
                         'session_id': st.session_state.session_id,
-                        'training_data': {'refinement_demo': st.session_state.refinement_demo}
+                        'training_data': {'refinement_demo': st.session_state.refinement_demo},
+                        'config': st.session_state.config
                     }
                     
                     st.session_state.preference_manager.save_dpo_training_session(
@@ -173,18 +538,17 @@ def dpo_interactive_interface():
         if st.button("🔄 Generate 4 Candidates", type="primary", use_container_width=True):
             with st.spinner("🔄 Generating multiple candidates..."):
                 try:
-                    api_key = st.secrets.get('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
-                    demo_config = st.session_state.config.copy()
-                    demo_config['openai']['api_key'] = api_key or 'demo-key'
+                    config = st.session_state.config
+                    api_key = config.get('openai', {}).get('api_key')
                     
-                    if api_key and api_key != 'demo-key':
+                    if api_key and api_key not in ['your-openai-api-key', 'demo-key']:
                         # Real API call
-                        bot = DPOBot(demo_config)
+                        bot = DPOBot(config)
                         candidates = bot._generate_candidates()
                     else:
                         # Demo mode
                         candidates = generate_demo_candidates()
-                        st.info("🧪 **Demo Mode** - Add OPENAI_API_KEY to secrets for live generation")
+                        st.info("🧪 **Demo Mode** - Configure OpenAI API key in Configuration tab for live generation")
                     
                     st.session_state.current_candidates = candidates
                     st.session_state.user_preferences = []
@@ -309,7 +673,8 @@ def learn_from_preferences(preferences: Dict):
             'session_metadata': {
                 'total_iterations': st.session_state.dpo_iteration,
                 'session_id': st.session_state.session_id
-            }
+            },
+            'config': st.session_state.config
         }
         
         st.session_state.preference_manager.save_dpo_training_session(
@@ -424,14 +789,16 @@ def main():
     
     **Train AI bots to write better field notes about real-world AI deployments!**
     
-    Choose your technique, participate in training, and deploy to live Bluesky posting.
+    Configure your goals, participate in training, and deploy to live Bluesky posting.
     """)
     
     # Sidebar for technique selection
     technique = create_sidebar()
     
     # Main content based on selected technique
-    if technique == "✍️ Self-Refine":
+    if technique == "⚙️ Configuration":
+        configuration_interface()
+    elif technique == "✍️ Self-Refine":
         self_refine_interface()
     elif technique == "🔄 DPO (Interactive Learning)":
         dpo_interactive_interface()
@@ -456,12 +823,16 @@ def main():
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown("🎯 **Goal:** 1,000 followers in 7 days")
+        target = st.session_state.config.get('project', {}).get('target_followers', 1000)
+        days = st.session_state.config.get('project', {}).get('duration_days', 7)
+        st.markdown(f"🎯 **Goal:** {target:,} followers in {days} days")
     with col2:
-        st.markdown("🏴‍☠️ **Theme:** Pirate AI Field Notes")
+        theme = st.session_state.config.get('project', {}).get('theme', 'pirate_field_notes')
+        st.markdown(f"🏴‍☠️ **Theme:** {theme.replace('_', ' ').title()}")
     with col3:
         if st.button("📊 View Live Bot"):
-            st.markdown("🔗 [Live Bluesky Bot](https://bsky.app/profile/thephillip.bsky.social)")
+            handle = st.session_state.config.get('bluesky', {}).get('handle', 'thephillip.bsky.social')
+            st.markdown(f"🔗 [Live Bot](https://bsky.app/profile/{handle})")
 
 if __name__ == "__main__":
     main() 

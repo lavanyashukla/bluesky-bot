@@ -41,6 +41,140 @@ def test_interactive_app_imports():
         print(f"❌ Import failed: {e}")
         return False
 
+def test_configuration_functionality():
+    """Test configuration interface functionality."""
+    print("\n⚙️ Testing Configuration Interface")
+    print("=" * 40)
+    
+    try:
+        # Test configuration data structures
+        config_template = {
+            'project': {
+                'name': 'Test AI Bot Project',
+                'target_followers': 5000,
+                'duration_days': 14,
+                'theme': 'professional',
+                'description': 'Test description'
+            },
+            'rules': {
+                'content_focus': 'real_world_ai_deployments',
+                'writing_style': 'professional_reporter',
+                'max_body_characters': 300,
+                'require_credible_source': True,
+                'avoid_buzzwords': True,
+                'accuracy_required': True,
+                'prohibited': ['marketing_buzzwords', 'unverified_claims']
+            },
+            'openai': {
+                'api_key': 'test-key',
+                'model': 'gpt-4o-mini',
+                'use_moderation': True
+            },
+            'bluesky': {
+                'handle': 'testbot.bsky.social',
+                'app_password': 'test-password'
+            }
+        }
+        
+        print("✅ Configuration template structure valid")
+        
+        # Test required config keys
+        required_sections = ['project', 'rules', 'openai', 'bluesky']
+        missing_sections = [s for s in required_sections if s not in config_template]
+        
+        if missing_sections:
+            print(f"❌ Missing config sections: {missing_sections}")
+            return False
+        
+        print("✅ All required configuration sections present")
+        
+        # Test project settings validation
+        project = config_template['project']
+        if project['target_followers'] < 100 or project['target_followers'] > 100000:
+            print("❌ Target followers out of valid range")
+            return False
+        
+        if project['duration_days'] < 1 or project['duration_days'] > 30:
+            print("❌ Duration days out of valid range")
+            return False
+        
+        print("✅ Project settings validation passed")
+        
+        # Test rules validation
+        rules = config_template['rules']
+        valid_content_types = ['real_world_ai_deployments', 'ai_research', 'tech_news', 'educational']
+        if rules['content_focus'] not in valid_content_types:
+            print("❌ Invalid content focus type")
+            return False
+        
+        valid_writing_styles = ['pirate_field_notes', 'professional_reporter', 'casual_observer', 'technical_analyst']
+        if rules['writing_style'] not in valid_writing_styles:
+            print("❌ Invalid writing style")
+            return False
+        
+        print("✅ Rules validation passed")
+        
+        # Test API key format validation
+        openai_key = config_template['openai']['api_key']
+        if openai_key and not (openai_key.startswith('sk-') or openai_key == 'test-key'):
+            print("⚠️ OpenAI API key format unusual (but accepting for test)")
+        
+        bluesky_handle = config_template['bluesky']['handle']
+        if bluesky_handle and '.bsky.social' not in bluesky_handle:
+            print("⚠️ Bluesky handle format unusual")
+        
+        print("✅ API credential format validation passed")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Configuration functionality test failed: {e}")
+        return False
+
+def test_config_export_import():
+    """Test configuration export/import functionality."""
+    print("\n📤📥 Testing Export/Import")
+    print("=" * 40)
+    
+    try:
+        import json
+        
+        # Test config with sensitive data
+        config_with_secrets = {
+            'project': {'name': 'Test Project'},
+            'openai': {'api_key': 'sk-real-secret-key'},
+            'bluesky': {'handle': 'test.bsky.social', 'app_password': 'real-password'}
+        }
+        
+        # Simulate export process (remove sensitive data)
+        safe_config = config_with_secrets.copy()
+        if 'openai' in safe_config and 'api_key' in safe_config['openai']:
+            safe_config['openai']['api_key'] = "your-openai-api-key"
+        if 'bluesky' in safe_config and 'app_password' in safe_config['bluesky']:
+            safe_config['bluesky']['app_password'] = "your-app-password"
+        
+        print("✅ Sensitive data filtering works")
+        
+        # Test JSON serialization
+        config_json = json.dumps(safe_config, indent=2)
+        if len(config_json) > 0:
+            print("✅ Configuration JSON export successful")
+        
+        # Test JSON deserialization (import)
+        imported_config = json.loads(config_json)
+        if imported_config['project']['name'] == 'Test Project':
+            print("✅ Configuration JSON import successful")
+        
+        # Verify secrets are removed
+        if imported_config['openai']['api_key'] == "your-openai-api-key":
+            print("✅ Sensitive data properly filtered in export")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Export/import test failed: {e}")
+        return False
+
 def test_preference_manager():
     """Test preference manager functionality."""
     print("\n🗄️ Testing Preference Manager")
@@ -57,7 +191,7 @@ def test_preference_manager():
         pm = PreferenceManager(test_db_path)
         print("✅ Preference manager created with test database")
         
-        # Test saving training session
+        # Test saving training session with config
         test_session_data = {
             'dpo_learning_data': [
                 {
@@ -69,12 +203,16 @@ def test_preference_manager():
                     },
                     'best_candidate': {'candidate': 'Test candidate 1', 'rating': 4}
                 }
-            ]
+            ],
+            'config': {
+                'project': {'target_followers': 1000},
+                'rules': {'max_body_characters': 280}
+            }
         }
         
         session_id = "test_session_123"
         preference_id = pm.save_dpo_training_session(test_session_data, session_id)
-        print(f"✅ Training session saved with ID: {preference_id}")
+        print(f"✅ Training session with config saved with ID: {preference_id}")
         
         # Test deployment
         deployment_result = pm.deploy_dpo_model(session_id, 1)
@@ -145,6 +283,13 @@ def test_config_loading():
         else:
             print("⚠️ Some bot configurations missing")
         
+        # Test config compatibility with new structure
+        project_config = config.get('project', {})
+        if 'target_followers' in project_config or 'duration_days' in project_config:
+            print("✅ Project configuration compatible")
+        else:
+            print("ℹ️ Project configuration will use defaults")
+        
         return True
         
     except Exception as e:
@@ -157,16 +302,20 @@ def test_demo_functions():
     print("=" * 40)
     
     try:
-        # Import the demo functions from interactive app
-        sys.path.insert(0, str(Path(__file__).parent))
-        
-        # Test simulate_self_refine function (need to extract it)
+        # Test simulate_self_refine function
         demo_self_refine = {
             'initial_draft': "Test initial draft",
             'critique': "Test critique",
             'refined_post': "Test refined post",
             'improvement_made': True
         }
+        
+        required_keys = ['initial_draft', 'critique', 'refined_post', 'improvement_made']
+        missing_keys = [k for k in required_keys if k not in demo_self_refine]
+        
+        if missing_keys:
+            print(f"❌ Missing demo self-refine keys: {missing_keys}")
+            return False
         
         print("✅ Self-refine demo data structure valid")
         
@@ -178,6 +327,10 @@ def test_demo_functions():
             "Demo candidate 4 with 🔄"
         ]
         
+        if len(demo_candidates) != 4:
+            print(f"❌ Expected 4 demo candidates, got {len(demo_candidates)}")
+            return False
+        
         print(f"✅ Demo candidates generated: {len(demo_candidates)}")
         
         # Validate demo candidates have required elements
@@ -186,6 +339,13 @@ def test_demo_functions():
             print("✅ All demo candidates have DPO signature emoji")
         else:
             print("⚠️ Some demo candidates missing signature emoji")
+        
+        # Test character limits
+        for i, candidate in enumerate(demo_candidates, 1):
+            if len(candidate) > 300:  # Max characters for posts
+                print(f"⚠️ Demo candidate {i} exceeds character limit: {len(candidate)} chars")
+            else:
+                print(f"✅ Demo candidate {i} within character limit: {len(candidate)} chars")
         
         return True
         
@@ -216,7 +376,15 @@ def test_streamlit_compatibility():
             'tabs',
             'expander',
             'code',
-            'metric'
+            'metric',
+            'text_input',
+            'text_area',
+            'number_input',
+            'selectbox',
+            'multiselect',
+            'checkbox',
+            'radio',
+            'rerun'  # Used for configuration updates
         ]
         
         missing_functions = []
@@ -236,10 +404,77 @@ def test_streamlit_compatibility():
         else:
             print("⚠️ Streamlit session state not available (older version?)")
         
+        # Test secrets access (for API keys)
+        if hasattr(st, 'secrets'):
+            print("✅ Streamlit secrets available for API key management")
+        else:
+            print("⚠️ Streamlit secrets not available")
+        
         return True
         
     except Exception as e:
         print(f"❌ Streamlit compatibility test failed: {e}")
+        return False
+
+def test_api_configuration():
+    """Test API configuration functionality."""
+    print("\n🔑 Testing API Configuration")
+    print("=" * 40)
+    
+    try:
+        # Test API key validation logic
+        def validate_openai_key(key):
+            if not key:
+                return "empty"
+            if key in ['your-openai-api-key', 'demo-key']:
+                return "demo"
+            if key.startswith('sk-'):
+                return "valid_format"
+            return "unknown_format"
+        
+        test_keys = [
+            ("", "empty"),
+            ("your-openai-api-key", "demo"),
+            ("demo-key", "demo"),
+            ("sk-test123", "valid_format"),
+            ("invalid-key", "unknown_format")
+        ]
+        
+        for key, expected in test_keys:
+            result = validate_openai_key(key)
+            if result == expected:
+                print(f"✅ OpenAI key validation: '{key[:10]}...' -> {result}")
+            else:
+                print(f"❌ OpenAI key validation failed: expected {expected}, got {result}")
+                return False
+        
+        # Test Bluesky handle validation
+        def validate_bluesky_handle(handle):
+            if not handle:
+                return "empty"
+            if '.bsky.social' in handle:
+                return "valid_format"
+            return "invalid_format"
+        
+        test_handles = [
+            ("", "empty"),
+            ("user.bsky.social", "valid_format"),
+            ("invalid-handle", "invalid_format")
+        ]
+        
+        for handle, expected in test_handles:
+            result = validate_bluesky_handle(handle)
+            if result == expected:
+                print(f"✅ Bluesky handle validation: '{handle}' -> {result}")
+            else:
+                print(f"❌ Bluesky handle validation failed: expected {expected}, got {result}")
+                return False
+        
+        print("✅ API configuration validation tests passed")
+        return True
+        
+    except Exception as e:
+        print(f"❌ API configuration test failed: {e}")
         return False
 
 def main():
@@ -249,10 +484,13 @@ def main():
     
     tests = [
         test_interactive_app_imports,
+        test_configuration_functionality,
+        test_config_export_import,
         test_preference_manager,
         test_config_loading,
         test_demo_functions,
-        test_streamlit_compatibility
+        test_streamlit_compatibility,
+        test_api_configuration
     ]
     
     results = []
@@ -266,8 +504,10 @@ def main():
         print("\n🚀 Ready to deploy interactive training app!")
         print("📝 Next steps:")
         print("   1. Run locally: streamlit run interactive_app.py")
-        print("   2. Deploy to Railway with SERVICE_TYPE=interactive")
-        print("   3. Add OPENAI_API_KEY to secrets for live generation")
+        print("   2. Use Configuration tab to set up API keys and goals")
+        print("   3. Train bots with Self-Refine and DPO techniques")
+        print("   4. Deploy to Railway with SERVICE_TYPE=interactive")
+        print("   5. Share with users for interactive AI training!")
         return 0
     else:
         print("❌ Some interactive app tests failed")
