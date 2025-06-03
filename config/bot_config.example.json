@@ -1,0 +1,72 @@
+{
+  "project": {
+    "name": "I Wonder Social-Bot Showdown",
+    "goal": "Reach 1,000 followers while teaching AI improvement loops",
+    "duration_days": 7,
+    "target_followers": 1000
+  },
+  "bluesky": {
+    "handle": "your-handle.bsky.social",
+    "password": "YOUR_BLUESKY_APP_PASSWORD",
+    "service": "https://bsky.social"
+  },
+  "openai": {
+    "api_key": "YOUR_OPENAI_API_KEY",
+    "model": "gpt-4",
+    "judge_model": "gpt-4o",
+    "max_tokens": 280,
+    "temperature": 0.7
+  },
+  "bots": {
+    "self_refine": {
+      "emoji": "🪲",
+      "name": "Self-Refine Bot",
+      "enabled": true,
+      "improvement_frequency": "every_post"
+    },
+    "dpo": {
+      "emoji": "👾", 
+      "name": "DPO Bot",
+      "enabled": true,
+      "improvement_threshold": 5,
+      "improvement_frequency": "continuous"
+    },
+    "rlaif": {
+      "emoji": "🐾",
+      "name": "RLAIF Bot", 
+      "enabled": true,
+      "improvement_frequency": "every_3_drafts"
+    },
+    "mind_pool": {
+      "emoji": "🦕",
+      "name": "Mind-Pool Bot",
+      "enabled": true,
+      "personas_count": 6,
+      "improvement_trigger": "every_50_impressions"
+    },
+    "devops_self_fix": {
+      "emoji": "🦍",
+      "name": "DevOps Self-Fix Bot",
+      "enabled": true,
+      "monitoring_interval": 60,
+      "improvement_frequency": "continuous"
+    }
+  },
+  "posting": {
+    "shift_interval_minutes": 30,
+    "max_posts_per_day": 48,
+    "rate_limit_buffer": 0.8
+  },
+  "rules": {
+    "tone": "educational, engaging, not overly technical",
+    "topics": ["AI/ML", "self-improvement", "tech leadership", "automation"],
+    "forbidden_words": ["crypto", "trading", "financial advice"],
+    "max_hashtags": 3,
+    "reply_sla_minutes": 120
+  },
+  "monitoring": {
+    "dashboard_refresh_seconds": 30,
+    "log_level": "INFO",
+    "metrics_retention_days": 30
+  }
+} 
